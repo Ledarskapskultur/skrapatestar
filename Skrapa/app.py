@@ -85,3 +85,27 @@ if st.button("✉️ Skicka offert"):
         st.success("✅ Offert skickad till " + email)
     else:
         st.warning("Fyll i namn, e-post och välj minst en kurs.")
+from collections import Counter
+
+st.markdown("---")
+st.subheader("📊 Vanligaste platser & priser (topp 5)")
+
+# 🔢 Lista alla platser
+platser_lista = [k.plats for k in kurser if k.plats]
+priser_lista = [k.pris for k in kurser if k.pris]
+
+# 🔝 Räkna topp 5
+topp_orter = Counter(platser_lista).most_common(5)
+topp_priser = Counter(priser_lista).most_common(5)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("**🏙️ Vanligaste platser:**")
+    for plats, antal in topp_orter:
+        st.markdown(f"- {plats} ({antal} st)")
+
+with col2:
+    st.markdown("**💰 Vanligaste priser:**")
+    for pris, antal in topp_priser:
+        st.markdown(f"- {pris} ({antal} st)")
