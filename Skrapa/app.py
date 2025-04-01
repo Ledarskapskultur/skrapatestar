@@ -28,7 +28,7 @@ maxpris = st.sidebar.text_input("Maxpris (t.ex. 28000)")
 
 # === Kurser från DB ===
 if st.button("🔄 Uppdatera kurser"):
-    skrapa_ugl_kurser()
+    skrapa_ugl_kurser()  # Se till att denna funktion finns i scraper_ugl.py
     st.success("Kurser uppdaterade!")
 
 session = Session()
