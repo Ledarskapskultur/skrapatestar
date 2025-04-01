@@ -54,13 +54,13 @@ def datum_till_vecka(datum_str):
 
 def ikon_för_platser(text):
     if "Full" in text:
-        return "🔴"
+        return "🔴 Fullbokad"
     elif "Få" in text:
-        return "🟡"
+        return "🟡 3 platser kvar"
     elif "Flera" in text or "3+" in text:
-        return "🟢"
+        return "🟢 Mer än 3 platser kvar"
     else:
-        return "⚪"
+        return "⚪ Okänt"
 
 # === Filtrering ===
 try:
@@ -101,10 +101,14 @@ else:
             except:
                 anläggning, ort = kurs.plats, ""
 
+            # Endast visa den första handledaren
+            handledare = kurs.handledare.split(",")[0] if kurs.handledare else "Okänd"
+
             visning = (
                 f"📆 v{vecka} | 💰 {pris}\n"
                 f"🏨 {anläggning}, {ort}\n"
-                f"{platsikon} Platser kvar: {kurs.platser}"
+                f"👨‍🏫 {handledare}\n"
+                f"{platsikon}"
             )
 
             if st.checkbox(visning, key=kurs.id):
