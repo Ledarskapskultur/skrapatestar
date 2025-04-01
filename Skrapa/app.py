@@ -46,6 +46,8 @@ def pris_som_siffra(pris_text):
 
 def datum_till_vecka(datum_str):
     try:
+        if "v" in datum_str:
+            return datum_str.strip().replace("v", "")
         dt = datetime.strptime(datum_str.split("–")[0].strip(), "%Y-%m-%d")
         return dt.isocalendar().week
     except:
@@ -91,9 +93,9 @@ else:
     cols = st.columns(4)
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
-            vecka = f"v{datum_till_vecka(kurs.datum)}"
-            pris = kurs.pris
+            vecka = datum_till_vecka(kurs.datum)
             platsikon = ikon_för_platser(kurs.platser)
+            pris = kurs.pris if kurs.pris else "Okänt"
 
             try:
                 anläggning, ort = map(str.strip, kurs.plats.split(",", 1))
@@ -101,7 +103,7 @@ else:
                 anläggning, ort = kurs.plats, ""
 
             visning = (
-                f"📆 {vecka} | 💰 {pris}\n"
+                f"📆 v{vecka} | 💰 {pris}\n"
                 f"🏨 {anläggning}, {ort}\n"
                 f"{platsikon} Platser kvar: {kurs.platser}"
             )
