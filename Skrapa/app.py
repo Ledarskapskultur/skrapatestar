@@ -2,7 +2,6 @@ import streamlit as st
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base, Kurs
-from scraper_ugl import skrapa_ugl_kurser
 from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
 from collections import Counter
