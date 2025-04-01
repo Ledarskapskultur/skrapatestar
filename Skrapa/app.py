@@ -8,7 +8,7 @@ from datetime import datetime
 from collections import Counter
 import re
 
-# === Databas ===
+# === DB ===
 engine = create_engine('sqlite:///kurser.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -36,7 +36,7 @@ session = Session()
 kurser = session.query(Kurs).all()
 session.close()
 
-# === Pris som siffra ===
+# === Hjälpfunktioner ===
 def pris_som_siffra(pris_text):
     try:
         siffror = re.findall(r'\d+', pris_text)
@@ -44,15 +44,24 @@ def pris_som_siffra(pris_text):
     except:
         return 0
 
-# === Datum till vecka ===
 def datum_till_vecka(datum_str):
     try:
         dt = datetime.strptime(datum_str.split("–")[0].strip(), "%Y-%m-%d")
-        return f"v{dt.isocalendar().week}"
+        return dt.isocalendar().week
     except:
-        return datum_str
+        return "?"
 
-# === Sortering & filtrering ===
+def ikon_för_platser(text):
+    if "Full" in text:
+        return "🔴"
+    elif "Få" in text:
+        return "🟡"
+    elif "Flera" in text or "3+" in text:
+        return "🟢"
+    else:
+        return "⚪"
+
+# === Filtrering ===
 try:
     maxpris_int = int(maxpris)
 except:
@@ -72,9 +81,8 @@ else:
             return datetime.max
     filtrerade = sorted(kurser, key=datum_sortering)[:10]
 
-# === Visa kurser ===
+# === Visa kurser i 4 kolumner ===
 st.subheader("✅ Välj kurser att inkludera i offert")
-
 valda_kurser = []
 
 if len(filtrerade) == 0:
@@ -83,8 +91,21 @@ else:
     cols = st.columns(4)
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
-            vecka = datum_till_vecka(kurs.datum)
-            visning = f"📅 {vecka}\n🏨 {kurs.plats}\n💰 {kurs.pris}"
+            vecka = f"v{datum_till_vecka(kurs.datum)}"
+            pris = kurs.pris
+            platsikon = ikon_för_platser(kurs.platser)
+
+            try:
+                anläggning, ort = map(str.strip, kurs.plats.split(",", 1))
+            except:
+                anläggning, ort = kurs.plats, ""
+
+            visning = (
+                f"📆 {vecka} | 💰 {pris}\n"
+                f"🏨 {anläggning}, {ort}\n"
+                f"{platsikon} Platser kvar: {kurs.platser}"
+            )
+
             if st.checkbox(visning, key=kurs.id):
                 valda_kurser.append(kurs)
 
@@ -97,7 +118,7 @@ if st.button("✉️ Skicka offert"):
     else:
         st.warning("Fyll i namn, e-post och välj minst en kurs.")
 
-# === Topp 5 efter plats och pris ===
+# === Topp 5 plats & pris ===
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
 
