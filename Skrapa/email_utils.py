@@ -1,3 +1,4 @@
+import streamlit as st
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
@@ -37,10 +38,10 @@ def generera_html_mail(kurser, namn):
     """
     return html
 
-# 📧 Skicka e-post via Outlooks SMTP med app-lösenord
+# 📧 Skicka e-post via Outlooks SMTP med secrets
 def skicka_mail(till, html_body, ämne="Din kursöversikt – UGL"):
-    från = "carl-fredrik@ledarskapskultur.se"         # ✅ Ändra till din Outlook-adress
-    lösenord = "kknckbjbrclvdsff"             # ✅ Klistra in app-lösenordet här
+    från = st.secrets["email"]["from_address"]
+    lösenord = st.secrets["email"]["app_password"]
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = ämne
@@ -48,7 +49,6 @@ def skicka_mail(till, html_body, ämne="Din kursöversikt – UGL"):
     msg["To"] = till
     msg.attach(MIMEText(html_body, "html"))
 
-    # 🟢 Anslut till Microsoft Outlook SMTP
     with smtplib.SMTP("smtp.office365.com", 587) as server:
         server.starttls()
         server.login(från, lösenord)
