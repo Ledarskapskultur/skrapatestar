@@ -3,14 +3,9 @@ from bs4 import BeautifulSoup
 import re
 import urllib.parse
 
-def scrape_ugl_guiden():
+def skrapa_ugl_kurser():
     url = "https://www.ugl-guiden.se/"
     response = requests.get(url)
-    
-    # Om förfrågan inte lyckas, returnera ett felmeddelande
-    if response.status_code != 200:
-        return f"Fel vid hämtning av data: {response.status_code}"
-    
     soup = BeautifulSoup(response.text, "html.parser")
     kurser = []
 
@@ -22,25 +17,24 @@ def scrape_ugl_guiden():
             if len(kolumner) < 5:
                 continue  # Hoppa över rader som inte har tillräcklig information
 
-            # Vecka
+            # Vecka och Datum
             vecka_rå = kolumner[0].find("b")
             vecka = f"v{vecka_rå.text.strip().replace('Vecka ', '')}" if vecka_rå else "?"
+            datum_rå = kolumner[0].text.strip()
+            datum = datum_rå.split("–")[0].strip() if "–" in datum_rå else datum_rå
 
-            # Plats (anläggning och ort)
+            # Kursgård (Anläggning och Ort)
             anläggning = kolumner[1].find_all("a")[0].text.strip()
             ort = kolumner[1].find_all("a")[1].text.strip()
             plats = f"{anläggning}, {ort}"
 
-            # Handledare
-            handledare_rå = kolumner[2].text.strip()
-            handledare_split = handledare_rå.split()
-            handledare = handledare_split[0]
-            if len(handledare_split) > 1:
-                handledare += " " + handledare_split[1]
-            handledare = re.sub(r'(?<=[a-zåäö])(?=[A-ZÅÄÖ])', ' ', handledare)  # Fixa ihopklistrade namn
+            # Handledare (Handledare1 och Handledare2)
+            handledare1 = kolumner[2].text.strip().split(",")[0]  # Första handledaren
+            handledare2 = kolumner[2].text.strip().split(",")[1] if len(kolumner[2].text.strip().split(",")) > 1 else "Okänd"  # Andra handledaren
 
             # Pris
-            pris = kolumner[3].text.strip()
+            pris_rå = kolumner[3].text.strip()
+            pris = re.sub(r'\D', '', pris_rå)  # Tar bort alla icke-siffriga tecken för att endast få priset
 
             # Platstillgång (t.ex. Fullbokad, Få platser)
             img = kolumner[4].find("img")
@@ -60,16 +54,18 @@ def scrape_ugl_guiden():
             # Google Maps-länk
             maps = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(plats)}"
 
-            # Lägg till kursinformationen till listan
+            # Lägg till kursinformation till listan
             kurser.append({
-                "namn": "UGL-utbildning",
-                "datum": vecka,
-                "plats": plats,
-                "pris": pris,
+                "vecka": vecka,
+                "datum": datum,
+                "anläggning": anläggning,
+                "ort": ort,
+                "handledare1": handledare1,
+                "handledare2": handledare2,
+                "pris": f"{pris} kr",
                 "platser": platser,
                 "hemsida": url,
-                "maps": maps,
-                "handledare": handledare
+                "maps": maps
             })
 
         except Exception as e:
