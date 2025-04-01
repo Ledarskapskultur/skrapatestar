@@ -12,7 +12,7 @@ engine = create_engine('sqlite:///kurser.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
-st.set_page_config(page_title="UGL Kursbokning", layout="wide")
+st.set_page_config(page_title="UGL Kursbokningssystem", layout="wide")
 st.title("🎓 UGL Kursbokningssystem")
 
 # === Kundinfo ===
@@ -92,8 +92,7 @@ else:
     cols = st.columns(4)
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
-            vecka = datum_till_vecka(kurs.datum)
-            platsikon = ikon_för_platser(kurs.platser)
+            vecka = datum_till_vecka(kurs.datum)  # Här får vi vecka från datum
             pris = kurs.pris if kurs.pris else "Okänt"
 
             try:
@@ -101,14 +100,15 @@ else:
             except:
                 anläggning, ort = kurs.plats, ""
 
-            # Endast visa den första handledaren
-            handledare = kurs.handledare.split(",")[0] if kurs.handledare else "Okänd"
+            # Ta bort handledare från visning
+            handledare = "Handledare: Ej visad"
+
+            platsikon = ikon_för_platser(kurs.platser)
 
             visning = (
-                f"📆 v{vecka} | 💰 {pris}\n"
+                f"📆 Vecka {vecka} | 💰 {pris} kr\n"
                 f"🏨 {anläggning}, {ort}\n"
-                f"👨‍🏫 {handledare}\n"
-                f"{platsikon}"
+                f"{platsikon} Platser kvar: {kurs.platser}"
             )
 
             if st.checkbox(visning, key=kurs.id):
