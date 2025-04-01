@@ -34,8 +34,8 @@ alla_orter = sorted(set([k.plats for k in kurser]))
 alla_priser = sorted(set([k.pris for k in kurser]))
 
 st.sidebar.header("🔎 Filtrering")
-vald_ort = st.sidebar.selectbox("Plats", ["Alla"] + alla_orter)
-vald_pris = st.sidebar.selectbox("Pris", ["Alla"] + alla_priser)
+vald_ort = st.sidebar.selectbox("Plats", ["Valfri"] + alla_orter)
+vald_pris = st.sidebar.selectbox("Pris", ["Valfri"] + alla_priser)
 
 filtrerade = [
     k for k in kurser if
