@@ -6,6 +6,7 @@ from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
 from collections import Counter
 import re
+from scraper_ugl import skrapa_ugl_kurser
 
 # === DB ===
 engine = create_engine('sqlite:///kurser.db')
@@ -28,12 +29,12 @@ maxpris = st.sidebar.text_input("Maxpris (t.ex. 28000)")
 
 # === Kurser från DB ===
 if st.button("🔄 Uppdatera kurser"):
-    skrapa_ugl_kurser()  # Se till att denna funktion finns i scraper_ugl.py
+    kurser = skrapa_ugl_kurser()  # Hämtar kursdata från den uppdaterade funktionen
     st.success("Kurser uppdaterade!")
-
-session = Session()
-kurser = session.query(Kurs).all()
-session.close()
+else:
+    session = Session()
+    kurser = session.query(Kurs).all()
+    session.close()
 
 # === Hjälpfunktioner ===
 def pris_som_siffra(pris_text):
@@ -42,25 +43,6 @@ def pris_som_siffra(pris_text):
         return int("".join(siffror)) if siffror else 0
     except:
         return 0
-
-def datum_till_vecka(datum_str):
-    try:
-        if "v" in datum_str:
-            return datum_str.strip().replace("v", "")
-        dt = datetime.strptime(datum_str.split("–")[0].strip(), "%Y-%m-%d")
-        return dt.isocalendar().week
-    except:
-        return "?"
-
-def ikon_för_platser(text):
-    if "Full" in text:
-        return "🔴 Fullbokad"
-    elif "Få" in text:
-        return "🟡 3 platser kvar"
-    elif "Flera" in text or "3+" in text:
-        return "🟢 Mer än 3 platser kvar"
-    else:
-        return "⚪ Okänt"
 
 # === Filtrering ===
 try:
@@ -71,13 +53,13 @@ except:
 if vald_ort.strip() or maxpris_int is not None:
     filtrerade = [
         k for k in kurser if
-        (vald_ort.strip() == "" or vald_ort.lower() in k.plats.lower()) and
-        (maxpris_int is None or pris_som_siffra(k.pris) <= maxpris_int)
+        (vald_ort.strip() == "" or vald_ort.lower() in k['ort'].lower()) and
+        (maxpris_int is None or pris_som_siffra(k['pris']) <= maxpris_int)
     ]
 else:
     def datum_sortering(kurs):
         try:
-            return datetime.strptime(kurs.datum.split("–")[0].strip(), "%Y-%m-%d")
+            return datetime.strptime(kurs['datum'].split("–")[0].strip(), "%Y-%m-%d")
         except:
             return datetime.max
     filtrerade = sorted(kurser, key=datum_sortering)[:10]
@@ -92,26 +74,14 @@ else:
     cols = st.columns(4)
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
-            vecka = datum_till_vecka(kurs.datum)  # Här får vi vecka från datum
-            pris = kurs.pris if kurs.pris else "Okänt"
-
-            try:
-                anläggning, ort = map(str.strip, kurs.plats.split(",", 1))
-            except:
-                anläggning, ort = kurs.plats, ""
-
-            # Ta bort handledare från visning
-            handledare = "Handledare: Ej visad"
-
-            platsikon = ikon_för_platser(kurs.platser)
-
             visning = (
-                f"📆 Vecka {vecka} | 💰 {pris} kr\n"
-                f"🏨 {anläggning}, {ort}\n"
-                f"{platsikon} Platser kvar: {kurs.platser}"
+                f"📆 Vecka {kurs['vecka']} | 📅 {kurs['datum']} | 💰 {kurs['pris']}\n"
+                f"🏨 {kurs['anläggning']}, {kurs['ort']}\n"
+                f"👨‍🏫 {kurs['handledare1']} & {kurs['handledare2']}\n"
+                f"🟡 Platser kvar: {kurs['platser']}"
             )
 
-            if st.checkbox(visning, key=kurs.id):
+            if st.checkbox(visning, key=kurs['vecka'] + kurs['datum']):
                 valda_kurser.append(kurs)
 
 # === Skicka offert ===
@@ -127,8 +97,8 @@ if st.button("✉️ Skicka offert"):
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
 
-platser_lista = [k.plats for k in kurser if k.plats]
-priser_lista = [k.pris for k in kurser if k.pris]
+platser_lista = [k['ort'] for k in kurser if k['ort']]
+priser_lista = [k['pris'] for k in kurser if k['pris']]
 
 topp_orter = Counter(platser_lista).most_common(5)
 topp_priser = Counter(priser_lista).most_common(5)
