@@ -5,37 +5,45 @@ from models import Kurs
 from sqlalchemy import create_engine
 import urllib.parse
 
-# Anslut till databasen
+# DB
 engine = create_engine("sqlite:///kurser.db")
 Session = sessionmaker(bind=engine)
 
-# 🔍 Tolka platstillgång utifrån bild-URL
+# 📊 Tolkning av platscirkel
 def tolka_cirkelbild(url):
     if "100" in url or "full" in url:
         return "Fullbokad"
     elif any(x in url for x in ["75", "80", "90"]):
         return "Fåtal platser kvar"
-    elif any(x in url for x in ["50", "60"]):
+    elif any(x in url for x in ["50", "60", "30", "25"]):
         return "Flera platser kvar"
     else:
         return "Okänt"
 
-# 🟢 Skrapa från ugl-guiden.se
+# 🟢 Skrapa ugl-guiden.se
 def scrape_ugl_guiden():
     url = "https://www.ugl-guiden.se/"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
     kurser = []
 
-    kurskort = soup.find_all("div", class_="course-card")  # OBS! Justera efter aktuell HTML
+    kurskort = soup.find_all("div", class_="course-card")  # Justera vid behov
 
     for kort in kurskort:
         try:
             namn = kort.find("h2").text.strip()
-            datum = kort.find("span", class_="date").text.strip()
-            plats = kort.find("span", class_="location").text.strip()
-            pris = kort.find("span", class_="price").text.strip()
-            handledare = kort.find("span", class_="teacher").text.strip()
+
+            datum_raw = kort.find("span", class_="date")
+            datum = datum_raw.text.strip() if datum_raw else "Okänt datum"
+
+            plats_raw = kort.find("span", class_="location")
+            plats = plats_raw.text.strip() if plats_raw else "Okänd plats"
+
+            pris_raw = kort.find("span", class_="price")
+            pris = pris_raw.text.strip() if pris_raw else "Meddelas senare"
+
+            handledare_raw = kort.find("span", class_="teacher")
+            handledare = handledare_raw.text.strip() if handledare_raw else "Okänd handledare"
 
             img = kort.find("img")
             platser = tolka_cirkelbild(img["src"]) if img else "Okänt"
@@ -57,7 +65,7 @@ def scrape_ugl_guiden():
             continue
     return kurser
 
-# 🟡 Skrapa från uglkurser.se
+# 🟡 Skrapa uglkurser.se
 def scrape_uglkurser():
     url = "https://www.uglkurser.se/datumochpriser.php"
     response = requests.get(url)
@@ -65,7 +73,7 @@ def scrape_uglkurser():
     kurser = []
 
     rows = soup.find_all("tr")
-    for row in rows[1:]:  # Skippa rubrikraden
+    for row in rows[1:]:
         cols = row.find_all("td")
         if len(cols) >= 5:
             datum = cols[0].text.strip()
@@ -88,7 +96,7 @@ def scrape_uglkurser():
             })
     return kurser
 
-# 🧼 Rensa dubbletter
+# 🧹 Dubblettfilter
 def rensa_dubletter(lista):
     unika = []
     sett = set()
@@ -99,7 +107,7 @@ def rensa_dubletter(lista):
             sett.add(nyckel)
     return unika
 
-# 💾 Spara till databasen
+# 💾 DB-spara
 def spara_kurser(kurser):
     session = Session()
     for k in kurser:
@@ -124,7 +132,7 @@ def spara_kurser(kurser):
     session.commit()
     session.close()
 
-# 🔁 Huvudfunktion
+# 🚀 Kör all skrapning
 def skrapa_ugl_kurser():
     alla = scrape_ugl_guiden() + scrape_uglkurser()
     unika = rensa_dubletter(alla)
