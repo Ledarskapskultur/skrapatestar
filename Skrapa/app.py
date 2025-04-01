@@ -5,6 +5,8 @@ from models import Base, Kurs
 from scraper_ugl import skrapa_ugl_kurser
 from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
+from collections import Counter
+import re
 
 # === Databas ===
 engine = create_engine('sqlite:///kurser.db')
@@ -12,16 +14,15 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
 st.set_page_config(page_title="UGL Kursbokning", layout="wide")
-
-# === Titel & kundinfo ===
 st.title("🎓 UGL Kursbokningssystem")
 
+# === Kundinfo ===
 st.sidebar.header("📇 Kundinfo")
 namn = st.sidebar.text_input("Ditt namn")
 telefon = st.sidebar.text_input("Telefonnummer")
 email = st.sidebar.text_input("E-postadress")
 
-# === Filter ===
+# === Filtrering ===
 st.sidebar.header("🔎 Filtrering")
 vald_ort = st.sidebar.text_input("Plats (valfritt)")
 maxpris = st.sidebar.text_input("Maxpris (t.ex. 28000)")
@@ -35,20 +36,23 @@ session = Session()
 kurser = session.query(Kurs).all()
 session.close()
 
-# === Hjälpfunktioner ===
+# === Pris som siffra ===
 def pris_som_siffra(pris_text):
     try:
-        return int("".join(filter(str.isdigit, pris_text)))
+        siffror = re.findall(r'\d+', pris_text)
+        return int("".join(siffror)) if siffror else 0
     except:
-        return 999999
+        return 0
 
-def datum_sortering(kurs):
+# === Datum till vecka ===
+def datum_till_vecka(datum_str):
     try:
-        return datetime.strptime(kurs.datum.split("–")[0].strip(), "%Y-%m-%d")
+        dt = datetime.strptime(datum_str.split("–")[0].strip(), "%Y-%m-%d")
+        return f"v{dt.isocalendar().week}"
     except:
-        return datetime.max
+        return datum_str
 
-# === Filtrering ===
+# === Sortering & filtrering ===
 try:
     maxpris_int = int(maxpris)
 except:
@@ -61,6 +65,11 @@ if vald_ort.strip() or maxpris_int is not None:
         (maxpris_int is None or pris_som_siffra(k.pris) <= maxpris_int)
     ]
 else:
+    def datum_sortering(kurs):
+        try:
+            return datetime.strptime(kurs.datum.split("–")[0].strip(), "%Y-%m-%d")
+        except:
+            return datetime.max
     filtrerade = sorted(kurser, key=datum_sortering)[:10]
 
 # === Visa kurser ===
@@ -69,12 +78,14 @@ st.subheader("✅ Välj kurser att inkludera i offert")
 valda_kurser = []
 
 if len(filtrerade) == 0:
-    st.warning("🚫 Inga kurser matchar din sökning. Justera filtren och försök igen.")
+    st.warning("🚫 Inga kurser matchar din sökning. Justera filtren.")
 else:
     cols = st.columns(4)
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
-            if st.checkbox(f"{kurs.namn}\n{kurs.datum}\n{kurs.plats} – {kurs.pris}", key=kurs.id):
+            vecka = datum_till_vecka(kurs.datum)
+            visning = f"📅 {vecka}\n🏨 {kurs.plats}\n💰 {kurs.pris}"
+            if st.checkbox(visning, key=kurs.id):
                 valda_kurser.append(kurs)
 
 # === Skicka offert ===
@@ -85,16 +96,14 @@ if st.button("✉️ Skicka offert"):
         st.success("✅ Offert skickad till " + email)
     else:
         st.warning("Fyll i namn, e-post och välj minst en kurs.")
-from collections import Counter
 
+# === Topp 5 efter plats och pris ===
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
 
-# 🔢 Lista alla platser
 platser_lista = [k.plats for k in kurser if k.plats]
 priser_lista = [k.pris for k in kurser if k.pris]
 
-# 🔝 Räkna topp 5
 topp_orter = Counter(platser_lista).most_common(5)
 topp_priser = Counter(priser_lista).most_common(5)
 
