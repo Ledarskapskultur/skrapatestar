@@ -3,75 +3,49 @@ from bs4 import BeautifulSoup
 import re
 import urllib.parse
 
-def skrapa_ugl_kurser():
-    url = "https://www.ugl-guiden.se/"
+def skrapa_uglkurser_kurser():
+    url = "https://www.uglkurser.se/datumochpriser.php"
     response = requests.get(url)
     if response.status_code != 200:
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
-    kursrader = soup.select("table.kurser tr")[1:]  # Hoppa över rubrikraden
+    tabell = soup.find("table", {"class": "ugltable"})
+    if not tabell:
+        return []
+
+    rader = tabell.find_all("tr")[1:]  # Skippa rubrikraden
     kurser = []
 
-    for rad in kursrader:
+    for rad in rader:
         kolumner = rad.find_all("td")
-        if len(kolumner) < 5:
+        if len(kolumner) < 6:
             continue
 
         try:
-            # Datum & Vecka
-            datum_och_vecka = kolumner[0].get_text(strip=True)
-            vecka_match = re.search(r"Vecka (\\d+)", datum_och_vecka)
-            vecka = f"v{vecka_match.group(1)}" if vecka_match else "?"
-            datum = datum_och_vecka.split("Vecka")[0].strip()
+            datum = kolumner[0].get_text(strip=True)
+            plats = kolumner[1].get_text(strip=True)
+            handledare = kolumner[2].get_text(strip=True)
+            pris = kolumner[3].get_text(strip=True)
+            status = kolumner[4].get_text(strip=True)
+            länk = kolumner[5].find("a")["href"] if kolumner[5].find("a") else url
 
-            # Anläggning & Ort
-            länkar = kolumner[1].find_all("a")
-            anläggning = länkar[0].get_text(strip=True) if len(länkar) > 0 else "?"
-            ort = länkar[1].get_text(strip=True) if len(länkar) > 1 else "?"
-            plats = f"{anläggning}, {ort}"
+            maps = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(plats)}"
 
-            # Handledare
-            handledare_text = kolumner[2].get_text(strip=True)
-            handledare_split = [h.strip() for h in handledare_text.split(",")]
-            handledare1 = handledare_split[0] if len(handledare_split) > 0 else "?"
-            handledare2 = handledare_split[1] if len(handledare_split) > 1 else "?"
-
-            # Pris
-            pris_rå = kolumner[3].get_text(strip=True)
-            pris = re.sub(r"[^\\d]", "", pris_rå) + " kr" if pris_rå else "?"
-
-            # Platser kvar
-            img = kolumner[4].find("img")
-            if img:
-                src = img["src"]
-                if "100" in src:
-                    platser = "Fullbokad"
-                elif "80" in src or "90" in src:
-                    platser = "Få"
-                elif "50" in src or "60" in src:
-                    platser = "Flera"
-                else:
-                    platser = "Okänt"
-            else:
-                platser = "Okänt"
-
-            maps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(plats)}"
-
-            kurser.append({
-                "vecka": vecka,
+            kurs = {
+                "namn": f"UGL {datum}",
                 "datum": datum,
-                "anläggning": anläggning,
-                "ort": ort,
-                "handledare1": handledare1,
-                "handledare2": handledare2,
+                "plats": plats,
+                "handledare": handledare,
                 "pris": pris,
-                "platser": platser,
-                "hemsida": url,
-                "maps": maps_url
-            })
+                "platser": status,
+                "hemsida": länk,
+                "maps": maps
+            }
 
-        except Exception as e:
+            kurser.append(kurs)
+
+        except Exception:
             continue
 
     return kurser
