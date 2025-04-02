@@ -6,7 +6,7 @@ from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
 from collections import Counter
 import re
-from scraper_uglkurser import skrapa_uglkurser_kurser
+from scraper_uglkurser import scraper_ugl
 
 # === DB Setup ===
 engine = create_engine('sqlite:///kurser.db')
