@@ -65,15 +65,19 @@ def pris_som_siffra(pris_text):
 
 # === Veckofiltrering ===
 def vecka_matchar(kursvecka, filterveckor):
-    veckor = set()
-    for del in filterveckor.split(','):
-        if '-' in del:
-            start, slut = map(int, del.split('-'))
-            veckor.update(range(start, slut + 1))
-        else:
-            veckor.add(int(del.strip()))
-    return int(re.findall(r'\d+', kursvecka)[0]) in veckor
-
+    try:
+        veckor = set()
+        for d in filterveckor.split(','):
+            d = d.strip()
+            if '-' in d:
+                start, slut = map(int, d.split('-'))
+                veckor.update(range(start, slut + 1))
+            else:
+                veckor.add(int(d))
+        kursvecka_nummer = int(re.findall(r'\\d+', kursvecka)[0])
+        return kursvecka_nummer in veckor
+    except:
+        return False
 # === Tillämpa filtrering ===
 filtrerade = []
 
