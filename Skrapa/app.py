@@ -6,35 +6,54 @@ from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
 from collections import Counter
 import re
-from scraper_ugl import skrapa_ugl_kurser  # Import från scraper_ugl.py
+from scraper_ugl import skrapa_ugl_kurser
 
-# === DB ===
+# === DB Setup ===
 engine = create_engine('sqlite:///kurser.db')
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
+# === Sidans layout ===
 st.set_page_config(page_title="UGL Kursbokningssystem", layout="wide")
 st.title("🎓 UGL Kursbokningssystem")
 
-# === Kundinfo ===
+# === Sidebar: Kundinfo ===
 st.sidebar.header("📇 Kundinfo")
 namn = st.sidebar.text_input("Ditt namn")
 telefon = st.sidebar.text_input("Telefonnummer")
 email = st.sidebar.text_input("E-postadress")
 
-# === Filtrering ===
+# === Sidebar: Filtrering ===
 st.sidebar.header("🔎 Filtrering")
-vald_ort = st.sidebar.text_input("Plats (valfritt)")
+vald_ort = st.sidebar.text_input("Plats (t.ex. Stockholm)")
 maxpris = st.sidebar.text_input("Maxpris (t.ex. 28000)")
+valda_veckor = st.sidebar.text_input("Veckor (t.ex. 15,20 eller 35-37)")
 
-# === Kurser från DB ===
+# === Uppdatera kurser från webben ===
 if st.button("🔄 Uppdatera kurser"):
-    kurser = skrapa_ugl_kurser()  # Hämtar kursdata från den uppdaterade funktionen
-    st.success("Kurser uppdaterade!")
-else:
+    kurser = skrapa_ugl_kurser()
     session = Session()
-    kurser = session.query(Kurs).all()
+    session.query(Kurs).delete()  # Rensa befintliga kurser
+    for kurs_data in kurser:
+        ny_kurs = Kurs(
+            namn=f"UGL-kurs {kurs_data['vecka']}",
+            datum=kurs_data['datum'],
+            platser=kurs_data['platser'],
+            plats=f"{kurs_data['anläggning']}, {kurs_data['ort']}",
+            pris=kurs_data['pris'],
+            hemsida=kurs_data['hemsida'],
+            maps=kurs_data['maps'],
+            handledare=f"{kurs_data['handledare1']}, {kurs_data['handledare2']}"
+        )
+        session.add(ny_kurs)
+    session.commit()
     session.close()
+    st.success("✅ Kurserna har uppdaterats!")
+
+# === Ladda kurser från DB ===
+session = Session()
+kurser = session.query(Kurs).all()
+session.close()
 
 # === Hjälpfunktioner ===
 def pris_som_siffra(pris_text):
@@ -44,27 +63,31 @@ def pris_som_siffra(pris_text):
     except:
         return 0
 
-# === Filtrering ===
-try:
-    maxpris_int = int(maxpris)
-except:
-    maxpris_int = None
+# === Veckofiltrering ===
+def vecka_matchar(kursvecka, filterveckor):
+    veckor = set()
+    for del in filterveckor.split(','):
+        if '-' in del:
+            start, slut = map(int, del.split('-'))
+            veckor.update(range(start, slut + 1))
+        else:
+            veckor.add(int(del.strip()))
+    return int(re.findall(r'\d+', kursvecka)[0]) in veckor
 
-if vald_ort.strip() or maxpris_int is not None:
-    filtrerade = [
-        k for k in kurser if
-        (vald_ort.strip() == "" or vald_ort.lower() in k['ort'].lower()) and
-        (maxpris_int is None or pris_som_siffra(k['pris']) <= maxpris_int)
-    ]
-else:
-    def datum_sortering(kurs):
-        try:
-            return datetime.strptime(kurs['datum'].split("–")[0].strip(), "%Y-%m-%d")
-        except:
-            return datetime.max
-    filtrerade = sorted(kurser, key=datum_sortering)[:10]
+# === Tillämpa filtrering ===
+filtrerade = []
 
-# === Visa kurser i 4 kolumner ===
+for k in kurser:
+    match_plats = (vald_ort.lower() in k.plats.lower()) if vald_ort.strip() else True
+    match_pris = (pris_som_siffra(k.pris) <= int(maxpris)) if maxpris.strip().isdigit() else True
+    match_vecka = vecka_matchar(k.namn, valda_veckor) if valda_veckor.strip() else True
+
+    if match_plats and match_pris and match_vecka:
+        filtrerade.append(k)
+
+filtrerade.sort(key=lambda x: datetime.strptime(x.datum.split("–")[0].strip(), "%Y-%m-%d"))
+
+# === Visa kurser ===
 st.subheader("✅ Välj kurser att inkludera i offert")
 valda_kurser = []
 
@@ -75,13 +98,13 @@ else:
     for i, kurs in enumerate(filtrerade):
         with cols[i % 4]:
             visning = (
-                f"📆 Vecka {kurs['vecka']} | 📅 {kurs['datum']} | 💰 {kurs['pris']}\n"
-                f"🏨 {kurs['anläggning']}, {kurs['ort']}\n"
-                f"👨‍🏫 {kurs['handledare1']} & {kurs['handledare2']}\n"
-                f"🟡 Platser kvar: {kurs['platser']}"
+                f"📆 {kurs.namn} | 📅 {kurs.datum}\n"
+                f"💰 {kurs.pris} | 🏨 {kurs.plats}\n"
+                f"👨‍🏫 {kurs.handledare}\n"
+                f"🟡 Platser kvar: {kurs.platser}"
             )
 
-            if st.checkbox(visning, key=kurs['vecka'] + kurs['datum']):
+            if st.checkbox(visning, key=f"{kurs.id}"):
                 valda_kurser.append(kurs)
 
 # === Skicka offert ===
@@ -93,12 +116,11 @@ if st.button("✉️ Skicka offert"):
     else:
         st.warning("Fyll i namn, e-post och välj minst en kurs.")
 
-# === Topp 5 plats & pris ===
+# === Statistik ===
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
-
-platser_lista = [k['ort'] for k in kurser if k['ort']]
-priser_lista = [k['pris'] for k in kurser if k['pris']]
+platser_lista = [k.plats.split(', ')[1] for k in kurser if k.plats]
+priser_lista = [k.pris for k in kurser if k.pris]
 
 topp_orter = Counter(platser_lista).most_common(5)
 topp_priser = Counter(priser_lista).most_common(5)
