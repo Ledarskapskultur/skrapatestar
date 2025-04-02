@@ -6,7 +6,7 @@ from email_utils import generera_html_mail, skicka_mail
 from datetime import datetime
 from collections import Counter
 import re
-from scraper_ugl import skrapa_ugl_kurser
+from scraper_uglkurser import skrapa_uglkurser_kurser
 
 # === DB Setup ===
 engine = create_engine('sqlite:///kurser.db')
@@ -54,19 +54,19 @@ def vecka_matchar(kursvecka, filterveckor):
 
 # === Uppdatera kurser från webben ===
 if st.button("🔄 Uppdatera kurser"):
-    skrapade_kurser = skrapa_ugl_kurser()
+    skrapade_kurser = skrapa_uglkurser_kurser()
     session = Session()
-    session.query(Kurs).delete()  # Rensa befintliga kurser
+    session.query(Kurs).delete()
     for kurs_data in skrapade_kurser:
         ny_kurs = Kurs(
-            namn=f"UGL-kurs {kurs_data['vecka']}",
+            namn=kurs_data['namn'],
             datum=kurs_data['datum'],
             platser=kurs_data['platser'],
-            plats=f"{kurs_data['anläggning']}, {kurs_data['ort']}",
+            plats=kurs_data['plats'],
             pris=kurs_data['pris'],
             hemsida=kurs_data['hemsida'],
             maps=kurs_data['maps'],
-            handledare=f"{kurs_data['handledare1']}, {kurs_data['handledare2']}"
+            handledare=kurs_data['handledare']
         )
         session.add(ny_kurs)
     session.commit()
@@ -123,7 +123,7 @@ if st.button("✉️ Skicka offert"):
 # === Statistik ===
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
-platser_lista = [k.plats.split(', ')[1] for k in kurser if k.plats and "," in k.plats]
+platser_lista = [k.plats.split(', ')[-1] for k in kurser if k.plats and "," in k.plats]
 priser_lista = [k.pris for k in kurser if k.pris]
 
 topp_orter = Counter(platser_lista).most_common(5)
@@ -143,10 +143,10 @@ with col2:
 
 # === Visa skrapad rådata ===
 st.markdown("---")
-st.subheader("📑 Skrapad kursdata (rådata från UGL-guiden.se)")
+st.subheader("📑 Skrapad kursdata (från uglkurser.se)")
 
 if st.button("🔍 Visa skrapad kursdata"):
-    skrapade_kurser = skrapa_ugl_kurser()
+    skrapade_kurser = skrapa_uglkurser_kurser()
 
     if not skrapade_kurser:
         st.warning("⚠️ Inga kurser kunde skrapas från källan.")
@@ -154,11 +154,11 @@ if st.button("🔍 Visa skrapad kursdata"):
         for kurs in skrapade_kurser:
             st.markdown(f"""
             ---
-            📅 **Vecka:** {kurs['vecka']}  
+            📅 **Namn:** {kurs['namn']}  
             📆 **Datum:** {kurs['datum']}  
-            🏨 **Plats:** {kurs['anläggning']}, {kurs['ort']}  
+            🏨 **Plats:** {kurs['plats']}  
             💰 **Pris:** {kurs['pris']}  
             🟡 **Platstillgång:** {kurs['platser']}  
-            👨‍🏫 **Handledare:** {kurs['handledare1']} och {kurs['handledare2']}  
+            👨‍🏫 **Handledare:** {kurs['handledare']}  
             🔗 [Hemsida]({kurs['hemsida']}) | 📍 [Karta]({kurs['maps']})
             """, unsafe_allow_html=True)
