@@ -29,12 +29,35 @@ vald_ort = st.sidebar.text_input("Plats (t.ex. Stockholm)")
 maxpris = st.sidebar.text_input("Maxpris (t.ex. 28000)")
 valda_veckor = st.sidebar.text_input("Veckor (t.ex. 15,20 eller 35-37)")
 
+# === Hjälpfunktioner ===
+def pris_som_siffra(pris_text):
+    try:
+        siffror = re.findall(r'\d+', pris_text)
+        return int("".join(siffror)) if siffror else 0
+    except:
+        return 0
+
+def vecka_matchar(kursvecka, filterveckor):
+    try:
+        veckor = set()
+        for d in filterveckor.split(','):
+            d = d.strip()
+            if '-' in d:
+                start, slut = map(int, d.split('-'))
+                veckor.update(range(start, slut + 1))
+            else:
+                veckor.add(int(d))
+        kursvecka_nummer = int(re.findall(r'\d+', kursvecka)[0])
+        return kursvecka_nummer in veckor
+    except:
+        return False
+
 # === Uppdatera kurser från webben ===
 if st.button("🔄 Uppdatera kurser"):
-    kurser = skrapa_ugl_kurser()
+    skrapade_kurser = skrapa_ugl_kurser()
     session = Session()
     session.query(Kurs).delete()  # Rensa befintliga kurser
-    for kurs_data in kurser:
+    for kurs_data in skrapade_kurser:
         ny_kurs = Kurs(
             namn=f"UGL-kurs {kurs_data['vecka']}",
             datum=kurs_data['datum'],
@@ -55,29 +78,6 @@ session = Session()
 kurser = session.query(Kurs).all()
 session.close()
 
-# === Hjälpfunktioner ===
-def pris_som_siffra(pris_text):
-    try:
-        siffror = re.findall(r'\d+', pris_text)
-        return int("".join(siffror)) if siffror else 0
-    except:
-        return 0
-
-# === Veckofiltrering ===
-def vecka_matchar(kursvecka, filterveckor):
-    try:
-        veckor = set()
-        for d in filterveckor.split(','):
-            d = d.strip()
-            if '-' in d:
-                start, slut = map(int, d.split('-'))
-                veckor.update(range(start, slut + 1))
-            else:
-                veckor.add(int(d))
-        kursvecka_nummer = int(re.findall(r'\\d+', kursvecka)[0])
-        return kursvecka_nummer in veckor
-    except:
-        return False
 # === Tillämpa filtrering ===
 filtrerade = []
 
@@ -123,7 +123,7 @@ if st.button("✉️ Skicka offert"):
 # === Statistik ===
 st.markdown("---")
 st.subheader("📊 Vanligaste platser & priser (topp 5)")
-platser_lista = [k.plats.split(', ')[1] for k in kurser if k.plats]
+platser_lista = [k.plats.split(', ')[1] for k in kurser if k.plats and "," in k.plats]
 priser_lista = [k.pris for k in kurser if k.pris]
 
 topp_orter = Counter(platser_lista).most_common(5)
@@ -140,6 +140,7 @@ with col2:
     st.markdown("**💰 Vanligaste priser:**")
     for pris, antal in topp_priser:
         st.markdown(f"- {pris} ({antal} st)")
+
 # === Visa skrapad rådata ===
 st.markdown("---")
 st.subheader("📑 Skrapad kursdata (rådata från UGL-guiden.se)")
