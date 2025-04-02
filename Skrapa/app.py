@@ -136,3 +136,24 @@ with col2:
     st.markdown("**💰 Vanligaste priser:**")
     for pris, antal in topp_priser:
         st.markdown(f"- {pris} ({antal} st)")
+# === Visa skrapad rådata ===
+st.markdown("---")
+st.subheader("📑 Skrapad kursdata (rådata från UGL-guiden.se)")
+
+if st.button("🔍 Visa skrapad kursdata"):
+    skrapade_kurser = skrapa_ugl_kurser()
+
+    if not skrapade_kurser:
+        st.warning("⚠️ Inga kurser kunde skrapas från källan.")
+    else:
+        for kurs in skrapade_kurser:
+            st.markdown(f"""
+            ---
+            📅 **Vecka:** {kurs['vecka']}  
+            📆 **Datum:** {kurs['datum']}  
+            🏨 **Plats:** {kurs['anläggning']}, {kurs['ort']}  
+            💰 **Pris:** {kurs['pris']}  
+            🟡 **Platstillgång:** {kurs['platser']}  
+            👨‍🏫 **Handledare:** {kurs['handledare1']} och {kurs['handledare2']}  
+            🔗 [Hemsida]({kurs['hemsida']}) | 📍 [Karta]({kurs['maps']})
+            """, unsafe_allow_html=True)
